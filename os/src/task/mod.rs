@@ -9,19 +9,21 @@
 //! Be careful when you see `__switch` ASM function in `switch.S`. Control flow around this function
 //! might not be what you expect.
 
-mod context;
-mod switch;
-#[allow(clippy::module_inception)]
-mod task;
+use lazy_static::*;
+
+pub use context::TaskContext;
+use switch::__switch;
+pub use task::{TaskControlBlock, TaskStatus};
 
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
-use lazy_static::*;
-use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus};
+use crate::task::task::TaskInfoBlock;
 
-pub use context::TaskContext;
+mod context;
+mod switch;
+#[allow(clippy::module_inception)]
+mod task;
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -36,15 +38,15 @@ pub struct TaskManager {
     /// total number of tasks
     num_app: usize,
     /// use inner value to get mutable access
-    inner: UPSafeCell<TaskManagerInner>,
+    pub inner: UPSafeCell<TaskManagerInner>,
 }
 
 /// Inner of Task Manager
 pub struct TaskManagerInner {
     /// task list
-    tasks: [TaskControlBlock; MAX_APP_NUM],
+    pub tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
-    current_task: usize,
+    pub current_task: usize,
 }
 
 lazy_static! {
@@ -54,6 +56,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_info: TaskInfoBlock::new(),
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
